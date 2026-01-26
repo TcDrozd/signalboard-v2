@@ -1,0 +1,43 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+
+# ---- Runtime / app data ----
+# Disk-backed cache (runtime state, not source)
+data/cache.json
+
+# Any future local data files
+data/*.tmp
+data/*.bak
+
+# ---- OS / editor junk ----
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- Logs ----
+*.log
+
+# ---- Secrets / env ----
+.env
+.env.*
+*.env
+
+# ---- Systemd / deployment artifacts (if added later) ----
+*.service
+*.timer
+*.path
+
+# ---- Misc ----
+echo
