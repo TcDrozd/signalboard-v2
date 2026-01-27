@@ -4,22 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Signal Board</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
-    .top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-    .title { font-weight: 650; }
-    .age { color: #666; font-size: 0.9rem; white-space: nowrap; }
-    .value { margin-top: 8px; font-size: 1.05rem; }
-    .details { margin-top: 8px; color: #444; font-size: 0.95rem; }
-    .status { font-size: 0.85rem; padding: 2px 8px; border-radius: 999px; border: 1px solid #ddd; }
-    .ok { background: #eaffea; }
-    .warn { background: #fff6dd; }
-    .bad { background: #ffe3e3; }
-    .unknown { background: #efefef; }
-    a { color: inherit; }
-  </style>
+  <link rel="stylesheet" href="{{ request.url_for('static', path='signalboard.css') }}">
 </head>
 <body>
   <h1 style="margin: 0 0 12px 0;">Signal Board</h1>
@@ -51,8 +36,8 @@
     {% endfor %}
   </div>
 
-  <p style="margin-top: 14px; color: #666;">
-    Data is served from cache. (Refresh comes in Burst 4.)
+  <p class="footer">
+    Data is served from cache.
   </p>
 </body>
 </html>

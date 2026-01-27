@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
 from core.cache import CacheStore
@@ -15,10 +16,13 @@ from core.view import build_views, format_age
 from signals import load_signals
 from signals.base import Signal, SignalMeta, SignalResult
 
+
 CACHE_PATH = Path("data/cache.json")
 
 app = FastAPI(title="SignalBoard", version="0.2")
 templates = Jinja2Templates(directory="templates")
+BASE_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
 @dataclass
