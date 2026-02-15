@@ -1,151 +1,102 @@
-## `README.md`
+# SignalBoard V2
 
-```markdown
-# SignalBoard
+SignalBoard V2 is a LAN-local, overengineered learning project that keeps signal
+execution global while introducing per-user dashboards via subscriptions.
 
-SignalBoard is a small, LAN-local “ambient status board” that aggregates lightweight
-signals from services, scripts, and APIs into a fast, readable dashboard.
+## What Changed From V1
 
-It is intentionally simple:
-- no database
-- no auth (LAN-only)
-- no websockets
-- no heavy frontend framework
+- FastAPI remains the web framework.
+- Signal abstractions remain unchanged: `Signal`, `SignalMeta`, `SignalResult`.
+- Global `CacheStore` still holds latest signal results.
+- New SQLite-backed user + subscription preferences.
+- Dashboards are now filtered per user, but signals execute once globally.
 
-The goal is **low cognitive load** and **easy extensibility** — something you can
-add to in short bursts and still find useful even when half-finished.
+## Architecture
 
----
-
-## What it does (today)
-
-- Discovers “signals” automatically from `signals/`
-- Periodically refreshes signal data into a disk-backed cache
-- Renders cached state via:
-  - HTML dashboard (`/`)
-  - Plain-text view (`/txt`) — great for terminals
-  - JSON API (`/api/signals`)
-- Supports live control actions:
-  - `POST /refresh` — fetch all signals now
-  - `POST /reload` — re-scan signal plugins
-
-Everything renders **from cache only**, so the UI stays fast even if upstream
-services are slow or down.
-
----
-
-## Architecture (mental model)
-
-```
-signals/        → fetch + normalize data
-core/cache.py   → persistence + safety
-core/view.py    → view model (age, defaults, formatting)
-FastAPI routes  → render cached state only
+```text
+signals/             -> signal implementations (unchanged)
+core/registry.py     -> signal discovery + metadata
+core/bg.py           -> global refresh engine + background signals
+core/cache.py        -> global cache persistence
+core/subscriptions.py-> SQLite users/subscriptions
+routers/             -> API + UI route modules
+models/              -> request payload validation
+templates/dashboard.html -> V2 UI shell
 ```
 
-Key idea:
-> **Signals fetch. Routes render. Cache mediates.**
+Design rule:
+> Execution is global. Subscriptions only filter rendering.
 
----
+## API Endpoints (V2 MVP)
 
-## Signals
+### Registry
 
-A *signal* is a small Python module that:
-- lives in `signals/`
-- exposes a single object named `SIGNAL`
-- implements:
-  - metadata (`id`, `title`, refresh cadence, timeout)
-  - `fetch()` → returns a normalized `SignalResult`
+- `GET /api/registry` -> list all available signals from registry metadata.
 
-Signals are auto-discovered at runtime — adding a new file is enough.
+### Users
 
-Examples included:
-- `board_health` – sanity check that the board is alive
-- `portfolio_last_commit_age` – polls GitHub for last commit time
-- `latest_dog_walk` – reads the most recent dog walk from a local API
+- `GET /api/users` -> list users.
+- `POST /api/users` -> create a user.
 
----
+Request body:
 
-## Configuration
-
-SignalBoard is designed to run as a system service.
-
-Configuration is supplied via environment variables, typically through a
-systemd `EnvironmentFile` (recommended).
-
-Example variables:
-
-```bash
-# GitHub-backed signals
-GITHUB_OWNER=TcDrozd
-GITHUB_REPO=portfolio
-GITHUB_TOKEN=github_pat_...
-
-PORTFOLIO_WARN_DAYS=7
-PORTFOLIO_BAD_DAYS=21
-
-# Local API signals
-DOGWALK_BASE_URL=http://apps.local:5010
-
-# Server
-PORT=8099
+```json
+{"username":"alice"}
 ```
 
-No `.env` parsing library is required — systemd handles injection.
+### Subscriptions
 
----
+- `GET /api/users/{username}/subscriptions` -> list subscribed signal ids.
+- `POST /api/users/{username}/subscriptions` -> subscribe user to a signal.
+- `DELETE /api/users/{username}/subscriptions/{signal_id}` -> unsubscribe.
 
-## Running locally (dev)
+Subscribe request body:
+
+```json
+{"signal_id":"board_health"}
+```
+
+### Personalized Dashboard Data
+
+- `GET /api/users/{username}/dashboard` -> only subscribed signals, resolved from global cache.
+
+### Global Execution/Admin Controls
+
+- `POST /api/refresh` -> refresh all signals (background signals are non-blocking).
+- `POST /api/reload` -> reload signal registry from `signals/`.
+- `GET /api/bg` -> background task status.
+- `GET /api/signals` -> global cached signal views (unfiltered).
+
+## UI
+
+- `GET /` -> V2 dashboard UI.
+  - Select/create user
+  - View all available signals
+  - Toggle subscriptions
+  - View that user's personalized dashboard
+
+## Storage
+
+- Global signal results: `data/cache.json`
+- User preferences: `data/subscriptions.db` (SQLite)
+
+Schema reference: `docs/subscriptions_schema.sql`
+
+## Running Locally
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install fastapi uvicorn jinja2
-
-uvicorn app:app --host 0.0.0.0 --port 8099
+pip install fastapi uvicorn jinja2 pydantic
+uvicorn app:app --host 0.0.0.0 --port 8099 --reload
 ```
 
-Then:
+Open:
 
-- `GET /` – HTML dashboard
-- `GET /txt` – terminal view
-- `POST /refresh`
-- `POST /reload`
+- App UI: `http://localhost:8099/`
+- OpenAPI docs: `http://localhost:8099/docs`
 
----
+## Notes
 
-## Running persistently (recommended)
-
-SignalBoard is intended to run as a systemd service on a LAN host or LXC.
-
-Typical setup:
-- `signalboard.service` → runs uvicorn
-- `signalboard-refresh.timer` → periodically hits `/refresh`
-
-This keeps the app stateless and avoids background refresh loops in-process.
-
----
-
-## Non-goals (for now)
-
-- Authentication
-- Multi-user support
-- Real-time push updates
-- Heavy UI or client-side state
-- Central configuration UI
-
-Those can be added later **if they earn their keep**.
-
----
-
-## Why this exists
-
-SignalBoard is less about the dashboard itself and more about:
-- building small, composable observability tools
-- practicing clean boundaries (fetch vs render vs policy)
-- creating ambient feedback loops that don’t demand attention
-
-It’s meant to be useful even when unfinished.
-```
-
-
+- No auth complexity yet; usernames are lightweight identifiers.
+- This is intentionally not production SaaS.

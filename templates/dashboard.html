@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SignalBoard V2</title>
+  <link rel="stylesheet" href="{{ request.url_for('static', path='signalboard.css') }}">
+</head>
+<body>
+  <header class="page-header">
+    <h1>SignalBoard V2</h1>
+    <p class="subtitle">Global signal execution, per-user dashboard subscriptions.</p>
+  </header>
+
+  <section class="panel controls">
+    <div class="controls-row">
+      <label for="user-select">User</label>
+      <select id="user-select"></select>
+      <input id="new-user" type="text" placeholder="new username" />
+      <button id="create-user-btn" type="button">Create User</button>
+      <button id="refresh-btn" type="button">Refresh Signals</button>
+    </div>
+  </section>
+
+  <section class="split">
+    <div class="panel">
+      <h2>Available Signals</h2>
+      <p class="muted">Toggle subscriptions for the selected user.</p>
+      <div id="available-signals"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Personal Dashboard</h2>
+      <p class="muted">Subscribed signals from global cache results.</p>
+      <div id="dashboard-grid" class="grid"></div>
+    </div>
+  </section>
+
+  <script>
+    const state = {
+      users: [],
+      registry: [],
+      selectedUser: null,
+      subscriptions: new Set()
+    };
+
+    async function api(url, options = {}) {
+      const res = await fetch(url, {
+        headers: {"Content-Type": "application/json"},
+        ...options
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || ("request failed: " + res.status));
+      }
+      return res.json();
+    }
+
+    async function loadUsers() {
+      const data = await api("/api/users");
+      state.users = data.users || [];
+      const select = document.getElementById("user-select");
+      select.innerHTML = "";
+      for (const user of state.users) {
+        const opt = document.createElement("option");
+        opt.value = user.username;
+        opt.textContent = user.username;
+        select.appendChild(opt);
+      }
+
+      if (!state.selectedUser && state.users.length > 0) {
+        state.selectedUser = state.users[0].username;
+      }
+      if (state.selectedUser) {
+        select.value = state.selectedUser;
+      }
+    }
+
+    async function loadRegistry() {
+      const data = await api("/api/registry");
+      state.registry = data.signals || [];
+    }
+
+    async function loadSubscriptions() {
+      if (!state.selectedUser) {
+        state.subscriptions = new Set();
+        return;
+      }
+      const data = await api("/api/users/" + encodeURIComponent(state.selectedUser) + "/subscriptions");
+      state.subscriptions = new Set(data.signals || []);
+    }
+
+    function renderAvailableSignals() {
+      const root = document.getElementById("available-signals");
+      root.innerHTML = "";
+
+      if (!state.selectedUser) {
+        root.innerHTML = "<p class='muted'>Create a user to manage subscriptions.</p>";
+        return;
+      }
+
+      for (const signal of state.registry) {
+        const row = document.createElement("label");
+        row.className = "signal-row";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = state.subscriptions.has(signal.id);
+        checkbox.addEventListener("change", async () => {
+          if (checkbox.checked) {
+            await api("/api/users/" + encodeURIComponent(state.selectedUser) + "/subscriptions", {
+              method: "POST",
+              body: JSON.stringify({signal_id: signal.id})
+            });
+          } else {
+            await api("/api/users/" + encodeURIComponent(state.selectedUser) + "/subscriptions/" + encodeURIComponent(signal.id), {
+              method: "DELETE"
+            });
+          }
+          await loadSubscriptions();
+          renderAvailableSignals();
+          await loadDashboard();
+        });
+
+        const text = document.createElement("span");
+        text.textContent = signal.title + " (" + signal.id + ")";
+
+        row.appendChild(checkbox);
+        row.appendChild(text);
+        root.appendChild(row);
+      }
+    }
+
+    function cardHtml(signal) {
+      const linkOpen = signal.link ? "<a href='" + signal.link + "' target='_blank' rel='noreferrer'>" : "";
+      const linkClose = signal.link ? "</a>" : "";
+      const details = signal.details ? "<div class='details'>" + signal.details + "</div>" : "";
+      return `
+        <article class="card">
+          <div class="top">
+            <div class="title">${linkOpen}${signal.title}${linkClose}</div>
+            <div class="age">${signal.age}</div>
+          </div>
+          <span class="status ${signal.status}">${signal.status}</span>
+          <div class="value">${signal.value}</div>
+          ${details}
+        </article>
+      `;
+    }
+
+    async function loadDashboard() {
+      const root = document.getElementById("dashboard-grid");
+      if (!state.selectedUser) {
+        root.innerHTML = "<p class='muted'>Select or create a user.</p>";
+        return;
+      }
+
+      const data = await api("/api/users/" + encodeURIComponent(state.selectedUser) + "/dashboard");
+      if (!data.signals.length) {
+        root.innerHTML = "<p class='muted'>No subscriptions yet for this user.</p>";
+        return;
+      }
+      root.innerHTML = data.signals.map(cardHtml).join("");
+    }
+
+    async function refreshSignals() {
+      await api("/api/refresh", {method: "POST"});
+      await loadDashboard();
+    }
+
+    async function createUser() {
+      const input = document.getElementById("new-user");
+      const username = input.value.trim();
+      if (!username) {
+        return;
+      }
+      await api("/api/users", {
+        method: "POST",
+        body: JSON.stringify({username})
+      });
+      input.value = "";
+      state.selectedUser = username;
+      await loadUsers();
+      await loadSubscriptions();
+      renderAvailableSignals();
+      await loadDashboard();
+    }
+
+    async function bootstrap() {
+      document.getElementById("create-user-btn").addEventListener("click", createUser);
+      document.getElementById("refresh-btn").addEventListener("click", refreshSignals);
+      document.getElementById("user-select").addEventListener("change", async (e) => {
+        state.selectedUser = e.target.value || null;
+        await loadSubscriptions();
+        renderAvailableSignals();
+        await loadDashboard();
+      });
+
+      await loadRegistry();
+      await loadUsers();
+      await loadSubscriptions();
+      renderAvailableSignals();
+      await loadDashboard();
+    }
+
+    bootstrap().catch((err) => {
+      const root = document.getElementById("dashboard-grid");
+      root.innerHTML = "<p class='muted'>UI init failed: " + err.message + "</p>";
+    });
+  </script>
+</body>
+</html>

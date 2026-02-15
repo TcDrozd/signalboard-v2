@@ -30,11 +30,60 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* --- Layout --- */
-h1 {
+.page-header h1 {
   margin: 0 0 14px 0;
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.subtitle {
+  margin: 0 0 16px 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.controls {
+  margin-bottom: 12px;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls-row input,
+.controls-row select,
+.controls-row button {
+  background: #10141c;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.controls-row button {
+  cursor: pointer;
+}
+
+.split {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
 }
 
 .grid {
@@ -43,9 +92,21 @@ h1 {
   gap: 12px;
 }
 
+.signal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 /* --- Cards --- */
 .card {
-  background: var(--panel);
+  background: #11151d;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px;
@@ -118,11 +179,4 @@ a {
 
 a:hover {
   text-decoration: underline;
-}
-
-/* --- Footer --- */
-.footer {
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 0.85rem;
 }

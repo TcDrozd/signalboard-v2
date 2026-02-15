@@ -1,51 +1,43 @@
-# SignalBoard Documentation
+# SignalBoard V2 Documentation
 
-SignalBoard is a lightweight, LAN-local ambient status board designed to surface
-small, meaningful signals from personal systems without demanding attention.
-
-It favors:
-- clarity over cleverness
-- cache-backed rendering over live calls
-- incremental growth over completeness
-
----
+SignalBoard V2 keeps signal fetching centralized while adding user-specific
+dashboard composition.
 
 ## Core Concepts
 
-### Signal
-A signal is a small plugin responsible for fetching **one** piece of information
-and normalizing it into a standard shape.
+### Global Execution
+Signals run once globally through the refresh engine in `core/bg.py`.
+Results are persisted in `CacheStore`.
 
-Signals live in `signals/` and are auto-discovered at runtime.
+### Subscription Filtering
+Users subscribe to signal ids. Subscriptions are stored in SQLite and used only
+to filter which cached signals appear on each user's dashboard.
 
-### Cache
-All UI surfaces render **from cache only**.
-This ensures fast, reliable output even if upstream services are slow or unavailable.
+### Rendering
+The dashboard UI (`/`) is user-centric and calls API routes to:
+- select/create users
+- toggle subscriptions
+- load personalized dashboard cards
 
-### Surfaces
-SignalBoard exposes the same data through:
-- HTML (`/`)
-- plain text (`/txt`)
-- JSON (`/api/signals`)
+## API Surfaces
 
----
+- `GET /api/registry`
+- `GET /api/users`
+- `POST /api/users`
+- `GET /api/users/{username}/subscriptions`
+- `POST /api/users/{username}/subscriptions`
+- `DELETE /api/users/{username}/subscriptions/{signal_id}`
+- `GET /api/users/{username}/dashboard`
 
-## Control Endpoints
+Operational endpoints:
+- `POST /api/refresh`
+- `POST /api/reload`
+- `GET /api/bg`
+- `GET /api/signals`
 
-- `POST /refresh` — fetch all signals and update cache
-- `POST /reload` — re-scan signal plugins
+## Storage
 
-These are intentionally explicit and separate.
+- `data/cache.json` -> global signal results
+- `data/subscriptions.db` -> users + subscriptions
 
----
-
-## Philosophy
-
-SignalBoard is not a monitoring or alerting system.
-
-It is meant to be:
-- glanced at
-- trusted
-- ignored when life is busy
-
-If a signal stops being useful, it should be easy to remove.
+See `docs/subscriptions_schema.sql` for schema.
