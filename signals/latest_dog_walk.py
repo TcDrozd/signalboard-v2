@@ -42,7 +42,10 @@ class LatestDogWalkSignal:
         id="latest_dog_walk",
         title="Rory: latest walk",
         poll_interval_s=120,
-        timeout_s=1.5,
+        # mDNS (.local) resolution can take a few seconds on some hosts.
+        # Keep this above typical resolver latency so engine-level wait_for
+        # doesn't mark the signal as timed out before the HTTP call completes.
+        timeout_s=6.0,
     )
 
     def fetch(self) -> SignalResult:

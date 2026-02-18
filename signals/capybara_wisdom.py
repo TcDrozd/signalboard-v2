@@ -4,12 +4,11 @@ import json
 import os
 import random
 from dataclasses import dataclass
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
 from .base import SignalMeta, SignalResult, now_utc
-
 
 # Fallback wisdom if Ollama is being difficult
 CAPYBARA_WISDOM = [
@@ -29,6 +28,7 @@ CAPYBARA_WISDOM = [
 def _today_local(tz_name: str) -> date:
     try:
         from zoneinfo import ZoneInfo
+
         return datetime.now(ZoneInfo(tz_name)).date()
     except Exception:
         return datetime.now(timezone.utc).date()
@@ -37,7 +37,7 @@ def _today_local(tz_name: str) -> date:
 def _ollama_generate(prompt: str, model: str, base_url: str, timeout_s: float) -> str:
     """Generate wisdom from Ollama with aggressive constraints."""
     url = f"{base_url.rstrip('/')}/api/generate"
-    
+
     body = {
         "model": model,
         "prompt": prompt,
@@ -61,42 +61,42 @@ def _ollama_generate(prompt: str, model: str, base_url: str, timeout_s: float) -
         payload = json.loads(resp.read().decode("utf-8"))
 
     raw = (payload.get("response") or "").strip()
-    
+
     # Debug logging
     print(f"RAW CAPY: {raw[:100]}")
-    
+
     # If it's just thinking tags or empty, bail out
     if not raw or raw.lower().startswith("<think>"):
         raise ValueError("Model returned thinking tags or empty response")
-    
+
     # Take everything before any <think> tag
     if "<think>" in raw.lower():
         idx = raw.lower().find("<think>")
         raw = raw[:idx].strip()
-    
-    # Take everything after any </think> tag  
+
+    # Take everything after any </think> tag
     if "</think>" in raw.lower():
         idx = raw.lower().find("</think>")
-        raw = raw[idx + 8:].strip()
-    
+        raw = raw[idx + 8 :].strip()
+
     # Remove quotes
     if raw.startswith('"') and raw.endswith('"'):
         raw = raw[1:-1]
-    
+
     # Take first sentence
     for ender in [". ", "! ", "? "]:
         if ender in raw:
             raw = raw.split(ender)[0] + ender[0]
             break
-    
+
     # Clean and limit length
     cleaned = raw.strip()
     if len(cleaned) > 100:
         cleaned = cleaned[:97] + "..."
-    
+
     if not cleaned or len(cleaned) < 5:
         raise ValueError("Response too short after cleaning")
-    
+
     return cleaned
 
 
@@ -111,7 +111,7 @@ class CapybaraWisdomSignal:
 
     def fetch(self) -> SignalResult:
         ollama_base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        model = os.getenv("CAPYBARA_MODEL", "llama3")
+        model = os.getenv("CAPYBARA_MODEL", "llama3.1:8b")
         tz_name = os.getenv("CAPYBARA_TZ", "America/Detroit")
 
         today = _today_local(tz_name)
@@ -122,7 +122,7 @@ class CapybaraWisdomSignal:
 
         # Try Ollama first
         prompt = "A calm capybara knows that"
-        
+
         try:
             sentence = _ollama_generate(
                 prompt=prompt,
@@ -133,7 +133,7 @@ class CapybaraWisdomSignal:
             # Prepend the prompt if not already there
             if not sentence.lower().startswith("a calm"):
                 sentence = f"{prompt} {sentence}"
-                
+
         except Exception as e:
             # Fall back to curated wisdom
             print(f"Ollama failed ({type(e).__name__}), using fallback wisdom")
@@ -148,4 +148,3 @@ class CapybaraWisdomSignal:
 
 
 SIGNAL = CapybaraWisdomSignal()
-

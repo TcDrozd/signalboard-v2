@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -14,14 +15,29 @@ from routers.admin import router as admin_router
 from routers.dashboard import router as dashboard_router
 from routers.subscriptions import router as subscriptions_router
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent
 CACHE_PATH = BASE_DIR / "data" / "cache.json"
 SUBSCRIPTIONS_DB_PATH = BASE_DIR / "data" / "subscriptions.db"
 BACKGROUND_SIGNALS = {"capybara_wisdom"}
 
+load_dotenv(BASE_DIR / ".env")
+
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="SignalBoard V2", version="2.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Startup order:
+        # 1) create DB schema for preferences
+        # 2) load persisted global signal cache
+        # 3) discover signal registry
+        app.state.subscriptions.init_schema()
+        app.state.cache.load()
+        app.state.registry.reload()
+        yield
+
+    app = FastAPI(title="SignalBoard V2", version="2.0", lifespan=lifespan)
 
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
     app.state.templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -40,17 +56,13 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(subscriptions_router)
 
-    @app.on_event("startup")
-    def startup() -> None:
-        # Startup order:
-        # 1) create DB schema for preferences
-        # 2) load persisted global signal cache
-        # 3) discover signal registry
-        app.state.subscriptions.init_schema()
-        app.state.cache.load()
-        app.state.registry.reload()
-
     return app
 
 
 app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app:app", host="0.0.0.0", port=8099, reload=False)
