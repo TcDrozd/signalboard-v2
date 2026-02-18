@@ -33,6 +33,7 @@ Thumbs.db
 .env
 .env.*
 *.env
+!.env.example
 
 # ---- Systemd / deployment artifacts (if added later) ----
 *.service
