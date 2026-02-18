@@ -15,14 +15,17 @@ from routers.admin import router as admin_router
 from routers.dashboard import router as dashboard_router
 from routers.subscriptions import router as subscriptions_router
 
+import os
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BASE_DIR / ".env")
+
+PORT = int(os.getenv("PORT", 8099))
 CACHE_PATH = BASE_DIR / "data" / "cache.json"
 SUBSCRIPTIONS_DB_PATH = BASE_DIR / "data" / "subscriptions.db"
 BACKGROUND_SIGNALS = {"capybara_wisdom"}
-
-load_dotenv(BASE_DIR / ".env")
 
 
 def create_app() -> FastAPI:
@@ -65,4 +68,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app:app", host="0.0.0.0", port=8099, reload=False)
+    uvicorn.run("app:app", host="0.0.0.0", port=PORT, reload=False)
